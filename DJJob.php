@@ -306,14 +306,13 @@ class DJJob extends DJBase {
     }
     
     public static function bulkEnqueue(array $handlers, $queue = "default", $run_at = null) {
-        $sql = "INSERT INTO jobs (handler, queue, run_at, created_at) VALUES";
-        $sql .= implode(",", array_fill(0, count($handlers), "(?, ?, ?, NOW())"));
         
         $parameters = array();
-        foreach ($handlers as $handler) {
+        foreach ($handlers as $k => $handler) {
 
             if (!($handler instanceof DJTask)) {
-                $this->log("* [JOB] skipping enqueueing of bad handler; must implement DJTask");
+                self::log("* [JOB] skipping enqueueing of bad handler; must implement DJTask");
+                unset($handlers[$k]);
                 continue;
             }
 
@@ -321,8 +320,12 @@ class DJJob extends DJBase {
             $parameters []= (string) $queue;
             $parameters []= $run_at;
         }
-        $affected = self::runUpdate($sql, $parameters);
         
+        $sql = "INSERT INTO jobs (handler, queue, run_at, created_at) VALUES";
+        $sql .= implode(",", array_fill(0, count($handlers), "(?, ?, ?, NOW())"));
+		
+        $affected = self::runUpdate($sql, $parameters);
+		        
         if ($affected < 1) {
             self::log("* [JOB] failed to enqueue new jobs");
             return false;
