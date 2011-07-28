@@ -86,10 +86,11 @@ class DJWorker extends DJBase {
             "queue" => "default",
             "count" => 0,
             "sleep" => 5,
-            "max_attempts" => 5
+            "max_attempts" => 5,
+            "quit_after_empty" => false,
         ), $options);
-        list($this->queue, $this->count, $this->sleep, $this->max_attempts) =
-            array($options["queue"], $options["count"], $options["sleep"], $options["max_attempts"]);
+        list($this->queue, $this->count, $this->sleep, $this->max_attempts, $this->quit_after_empty) =
+            array($options["queue"], $options["count"], $options["sleep"], $options["max_attempts"], $options["quit_after_empty"]);
 
         list($hostname, $pid) = array(trim(`hostname`), getmypid());
         $this->name = "host::$hostname pid::$pid";
@@ -159,6 +160,12 @@ class DJWorker extends DJBase {
 
                 if (!$job) {
                     $this->log("* [JOB] Failed to get a job, queue::{$this->queue} may be empty");
+                    
+                    if ($this->quit_after_empty) {
+                        $this->log("* [JOB] Quitting worker {$this->name} on queue::{$this->queue} since queue was empty.");
+                        die;
+                    }
+                    
                     sleep($this->sleep);
                     continue;
                 }
@@ -323,9 +330,9 @@ class DJJob extends DJBase {
         
         $sql = "INSERT INTO jobs (handler, queue, run_at, created_at) VALUES";
         $sql .= implode(",", array_fill(0, count($handlers), "(?, ?, ?, NOW())"));
-		
+    
         $affected = self::runUpdate($sql, $parameters);
-		        
+                
         if ($affected < 1) {
             self::log("* [JOB] failed to enqueue new jobs");
             return false;
