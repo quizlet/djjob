@@ -161,12 +161,13 @@ class DJWorker extends DJBase {
                 if (!$job) {
                     $this->log("* [JOB] Failed to get a job, queue::{$this->queue} may be empty");
                     
+                    sleep($this->sleep);
+                    
                     if ($this->quit_after_empty) {
                         $this->log("* [JOB] Quitting worker {$this->name} on queue::{$this->queue} since queue was empty.");
                         die;
                     }
                     
-                    sleep($this->sleep);
                     continue;
                 }
 
