@@ -275,7 +275,7 @@ class DJJob extends DJBase {
                 $this->job_id
             )
         );
-        $this->log("* [JOB] failure in job::{$this->job_id}");
+        $this->log("* [JOB] failure in job::{$this->job_id}: ".$error);
         $this->releaseLock();
     }
     
