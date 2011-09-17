@@ -282,7 +282,7 @@ class DJJob extends DJBase {
     public function retryLater() {
         $this->runUpdate("
             UPDATE jobs
-            SET run_at = DATE_ADD(NOW(), INTERVAL 2 HOUR),
+            SET run_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE),
                 attempts = attempts + 1
             WHERE id = ?",
             array($this->job_id)
