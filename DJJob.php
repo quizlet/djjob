@@ -213,6 +213,7 @@ class DJJob extends DJBase {
         } catch (DJRetryException $e) {
             
             # signal that this job should be retried later
+            $this->log("* [JOB] got DJRetryException ".$e->getMessage());
             $this->retryLater();
             return false;
             
@@ -237,6 +238,8 @@ class DJJob extends DJBase {
             $this->log("* [JOB] failed to acquire lock for job::{$this->job_id}");
             return false;
         }
+		
+		$this->log("* [JOB] acquired lock for job::{$this->job_id} on {$this->worker_name}");
         
         return true;
     }
