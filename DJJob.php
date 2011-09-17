@@ -318,6 +318,11 @@ class DJJob extends DJBase {
         $parameters = array();
         foreach ($handlers as $k => $handler) {
 
+            if (!$handler) {
+                self::log("* [JOB] skipping enqueueing of non-existant handler");
+                unset($handlers[$k]);
+                continue;
+            }
             if (!($handler instanceof DJTask)) {
                 self::log("* [JOB] skipping enqueueing of bad handler; must implement DJTask");
                 unset($handlers[$k]);
