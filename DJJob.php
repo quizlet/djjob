@@ -12,6 +12,7 @@ interface DJTask {
 
 class DJBase {
     
+    private static $mail = null;
     private static $db = null;
     
     private static $dsn = "";
@@ -29,6 +30,11 @@ class DJBase {
 
     public static function setConnection(PDO $db) {
         self::$db = $db;
+    }
+
+    // name of available mail class expects devSend(subject, message) static function
+    public static function setMail($mail) {
+        self::$mail = $mail;
     }
     
     protected static function getConnection() {
@@ -49,6 +55,13 @@ class DJBase {
             }
         }
         return self::$db;
+    }
+
+    public static function sendError($subject, $message) {
+        if (!self::$mail) {
+            return;
+        }
+       forward_static_call(array(self::$mail, "devSend"), $subject, $message);
     }
     
     public static function runQuery($sql, array $params = array()) {
@@ -176,6 +189,7 @@ class DJWorker extends DJBase {
             }
         } catch (Exception $e) {
             $this->log("* [JOB] unhandled exception::\"{$e->getMessage()}\"");
+            self::sendError("DJWorker unhandled exception", $e->getMessage());
         }
 
         $this->log("* [JOB] worker shutting down after running {$job_count} jobs, over {$count} polling iterations");
@@ -276,6 +290,7 @@ class DJJob extends DJBase {
             )
         );
         $this->log("* [JOB] failure in job::{$this->job_id}: ".$error);
+        self::sendError("DJJob failure in job::{$this->job_id}", $error);
         $this->releaseLock();
     }
     
