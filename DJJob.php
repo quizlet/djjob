@@ -61,7 +61,7 @@ class DJBase {
         if (!self::$mail) {
             return;
         }
-       forward_static_call(array(self::$mail, "devSend"), $subject, $message);
+       forward_static_call(array(self::$mail, "devSend"), $subject, $message."\n".print_r($this, true)."\n".print_r(debug_backtrace(), true));
     }
     
     public static function runQuery($sql, array $params = array()) {
