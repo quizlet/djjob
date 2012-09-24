@@ -215,7 +215,7 @@ class DJJob extends DJBase {
             $this->finishWithError("bad handler for job::{$this->job_id}, must implement DJTask");
             return false;
         }
-        
+
         # run the handler
         try {
             $handler->perform();
@@ -233,7 +233,7 @@ class DJJob extends DJBase {
             
         } catch (Exception $e) {
             
-            $this->finishWithError($e->__toString()."\n".print_r($handler, true));
+            $this->finishWithError($e->__toString()."\n".var_export($handler, true));
             return false;
             
         }
