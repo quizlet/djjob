@@ -86,7 +86,7 @@ class DJBase {
     }
     
     protected static function log($mesg) {
-        echo $mesg . "\n";
+        echo "<pre>".htmlspecialchars($mesg)."</pre>\n";
     }
 }
 
@@ -233,7 +233,7 @@ class DJJob extends DJBase {
             
         } catch (Exception $e) {
             
-            $this->finishWithError($e->__toString());
+            $this->finishWithError($e->__toString()."\n".print_r($handler, true));
             return false;
             
         }
