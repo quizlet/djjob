@@ -216,9 +216,10 @@ class DJJob extends DJBase {
             $this->log("* [JOB] bad handler for job::{$this->job_id}, must implement DJTask");
             return false;
         }
+
         # run the handler
         try {
-        }
+
             $handler->perform();
             
             # cleanup
