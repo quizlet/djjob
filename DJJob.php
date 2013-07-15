@@ -6,8 +6,16 @@ class DJException extends Exception { }
 
 class DJRetryException extends DJException { }
 
-interface DJTask {
-    public function perform();
+abstract class DJTask {
+    public function getMaxAttempts() {
+        return 5;
+    }
+
+    public function getDelay() {
+        return 5*60;
+    }
+
+    abstract public function perform();
 }
 
 class DJBase {
@@ -99,11 +107,10 @@ class DJWorker extends DJBase {
             "queue" => "default",
             "count" => 0,
             "sleep" => 5,
-            "max_attempts" => 5,
             "quit_after_empty" => false,
         ), $options);
-        list($this->queue, $this->count, $this->sleep, $this->max_attempts, $this->quit_after_empty) =
-            array($options["queue"], $options["count"], $options["sleep"], $options["max_attempts"], $options["quit_after_empty"]);
+        list($this->queue, $this->count, $this->sleep, $this->quit_after_empty) =
+            array($options["queue"], $options["count"], $options["sleep"], $options["quit_after_empty"]);
 
         list($hostname, $pid) = array(trim(`hostname`), getmypid());
         $this->name = "host::$hostname pid::$pid";
@@ -144,15 +151,12 @@ class DJWorker extends DJBase {
             AND    (run_at IS NULL OR NOW() >= run_at)
             AND    (locked_at IS NULL OR locked_by = ?)
             AND    failed_at IS NULL
-            AND    attempts < ?
             ORDER BY RAND()
             LIMIT  5
-        ", array($this->queue, $this->name, $this->max_attempts));
+        ", array($this->queue, $this->name));
         
         foreach ($rs as $r) {
-            $job = new DJJob($this->name, $r["id"], array(
-                "max_attempts" => $this->max_attempts
-            ));
+            $job = new DJJob($this->name, $r["id"]);
             if ($job->acquireLock()) return $job;
         }
         
@@ -197,14 +201,12 @@ class DJWorker extends DJBase {
 }
 
 class DJJob extends DJBase {
+
+    private $handler = null;
     
     public function __construct($worker_name, $job_id, array $options = array()) {
-        $options = array_merge(array(
-            "max_attempts" => 5
-        ), $options);
         $this->worker_name = $worker_name;
         $this->job_id = $job_id;
-        $this->max_attempts = $options["max_attempts"];
     }
     
     public function run() {
@@ -212,12 +214,11 @@ class DJJob extends DJBase {
         $handler = $this->getHandler();
         if (!($handler instanceof DJTask)) {
             $this->log("* [JOB] bad handler for job::{$this->job_id}, must implement DJTask");
-            $this->finishWithError("bad handler for job::{$this->job_id}, must implement DJTask");
             return false;
         }
-
         # run the handler
         try {
+        }
             $handler->perform();
             
             # cleanup
@@ -233,7 +234,7 @@ class DJJob extends DJBase {
             
         } catch (Exception $e) {
             
-            $this->finishWithError($e->__toString()."\n".var_export($handler, true));
+            $this->finishWithError($handler, $error);
             return false;
             
         }
@@ -275,17 +276,20 @@ class DJJob extends DJBase {
         $this->log("* [JOB] completed job::{$this->job_id}");
     }
     
-    public function finishWithError($error) {
+    public function finishWithError($handler, $error) {
+        $error = $e->__toString()."\n".var_export($handler, true);
         $this->runUpdate("
             UPDATE jobs
             SET attempts = attempts + 1,
                 failed_at = IF(attempts >= ?, NOW(), NULL),
-                error = IF(attempts >= ?, ?, NULL)
+                error = IF(attempts >= ?, ?, NULL),
+                run_at = DATE_ADD(NOW(), INTERVAL ? SECOND)
             WHERE id = ?",
             array(
-                $this->max_attempts,
-                $this->max_attempts,
+                $handler->getMaxAttempts(),
+                $handler->getMaxAttempts(),
                 $error,
+                $handler->getDelay(),
                 $this->job_id
             )
         );
@@ -297,10 +301,10 @@ class DJJob extends DJBase {
     public function retryLater() {
         $this->runUpdate("
             UPDATE jobs
-            SET run_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE),
+            SET run_at = DATE_ADD(NOW(), INTERVAL ? SECOND),
                 attempts = attempts + 1
             WHERE id = ?",
-            array($this->job_id)
+            array($this->getHandler()->getDelay(), $this->job_id)
         );
         $this->releaseLock();
     }
@@ -309,12 +313,17 @@ class DJJob extends DJBase {
      * @return DJTask
      */
     public function getHandler() {
+        if ($this->handler !== NULL) {
+            return $this->handler;
+        }
         $rs = $this->runQuery(
             "SELECT handler FROM jobs WHERE id = ?", 
             array($this->job_id)
         );
-        foreach ($rs as $r) return unserialize($r["handler"]);
-        return false;
+        if (!$rs)
+            return false;
+        $this->handler = unserialize($rs[0]["handler"]);
+        return $this->handler;
     }
     
     public static function enqueue(DJTask $handler, $queue = "default", $run_at = null) {
