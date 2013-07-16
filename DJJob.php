@@ -235,7 +235,7 @@ class DJJob extends DJBase {
             
         } catch (Exception $e) {
             
-            $this->finishWithError($handler, $e->getMessage());
+            $this->finishWithError($handler, $e);
             return false;
             
         }
@@ -277,7 +277,7 @@ class DJJob extends DJBase {
         $this->log("* [JOB] completed job::{$this->job_id}");
     }
     
-    public function finishWithError($handler, $error) {
+    public function finishWithError($handler, $e) {
         $error = $e->__toString()."\n".var_export($handler, true);
         $this->runUpdate("
             UPDATE jobs
