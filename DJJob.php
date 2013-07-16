@@ -235,7 +235,7 @@ class DJJob extends DJBase {
             
         } catch (Exception $e) {
             
-            $this->finishWithError($handler, $error);
+            $this->finishWithError($handler, $e->getMessage());
             return false;
             
         }
