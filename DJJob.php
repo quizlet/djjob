@@ -278,7 +278,7 @@ class DJJob extends DJBase {
     }
     
     public function finishWithError($handler, $e) {
-        $error = $e->__toString()."\n".var_export($handler, true);
+        $error = $e->__toString()."\n";
         $this->runUpdate("
             UPDATE jobs
             SET attempts = attempts + 1,
