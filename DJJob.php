@@ -22,6 +22,7 @@ class DJBase {
     
     private static $mail = null;
     private static $db = null;
+    private static $outputLog = true;
     
     private static $dsn = "";
     private static $options = array(
@@ -43,6 +44,10 @@ class DJBase {
     // name of available mail class expects devSend(subject, message) static function
     public static function setMail($mail) {
         self::$mail = $mail;
+    }
+
+    public static function outputLog($outputLog) {
+        self::$outputLog = $outputLog;
     }
     
     protected static function getConnection() {
@@ -94,6 +99,7 @@ class DJBase {
     }
     
     protected static function log($mesg) {
+        if (!self::$outputLog) return;
         echo "<pre>".htmlspecialchars($mesg)."</pre>\n";
     }
 }
