@@ -1,6 +1,6 @@
 <?php
 
-# This system is mostly a port of delayed_job: http://github.com/tobi/delayed_job
+// This system is mostly a port of delayed_job: http://github.com/tobi/delayed_job
 
 class DJException extends Exception { }
 
