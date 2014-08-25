@@ -212,7 +212,7 @@ class DJJob extends DJBase {
     
     public function __construct($worker_name, $job_id, array $options = array()) {
         $this->worker_name = $worker_name;
-        $this->job_id = $job_id;
+        $this->job_id = (int) $job_id;
     }
     
     public function run() {
