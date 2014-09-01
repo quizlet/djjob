@@ -100,7 +100,7 @@ class DJBase {
     
     protected static function log($mesg) {
         if (!self::$outputLog) return;
-        echo "<pre>".htmlspecialchars($mesg)."</pre>\n";
+        echo "[".date('r')."] {$mesg}\n";
     }
 }
 
