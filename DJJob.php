@@ -158,7 +158,7 @@ class DJWorker extends DJBase {
             AND    (locked_at IS NULL OR locked_by = ?)
             AND    failed_at IS NULL
             ORDER BY RAND()
-            LIMIT  5
+            LIMIT 1
         ", array($this->queue, $this->name));
         
         foreach ($rs as $r) {
