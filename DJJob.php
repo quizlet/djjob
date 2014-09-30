@@ -301,7 +301,7 @@ class DJJob extends DJBase {
             )
         );
         $this->log("* [JOB] failure in job::{$this->job_id}: ".$error);
-        self::sendError("DJJob failure in job::{$this->job_id}", $error);
+        self::sendError("DJJob failure in job::{$this->job_id}", $error."\n\n".var_export(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), true));
         $this->releaseLock();
     }
     
