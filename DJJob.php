@@ -105,8 +105,8 @@ class DJBase {
 }
 
 class DJWorker extends DJBase {
-    # This is a singleton-ish thing. It wouldn't really make sense to
-    # instantiate more than one in a single request (or commandline task)
+    // This is a singleton-ish thing. It wouldn't really make sense to
+    // instantiate more than one in a single request (or commandline task)
     
     public function __construct(array $options = array()) {
         $options = array_merge(array(
@@ -149,7 +149,7 @@ class DJWorker extends DJBase {
     }
     
     public function getNewJob() {
-        # we can grab a locked job if we own the lock
+        // we can grab a locked job if we own the lock
         $rs = $this->runQuery("
             SELECT id
             FROM   jobs
@@ -252,11 +252,24 @@ class DJJob extends DJBase {
         
         $lock = $this->runUpdate("
             UPDATE jobs
-            SET    locked_at = NOW(), locked_by = ?
-            WHERE  id = ? AND (locked_at IS NULL OR locked_by = ?) AND failed_at IS NULL
-        ", array($this->worker_name, $this->job_id, $this->worker_name));
-        
+            SET locked_at = NOW(), locked_by = ?
+            WHERE  id = ?
+        ", array($this->worker_name, $this->job_id));
+
         if (!$lock) {
+            $this->log("* [JOB] failed to acquire lock for job::{$this->job_id}");
+            return false;
+        }
+
+        usleep(20000); // 20 ms
+
+        $job = $this->runQuery("
+            SELECT locked_by
+            FROM jobs
+            WHERE id = ? AND failed_at IS NULL
+        ", array($this->job_id));
+
+        if (!$job || $job[0]['locked_by'] !== $this->worker_name) {
             $this->log("* [JOB] failed to acquire lock for job::{$this->job_id}");
             return false;
         }
