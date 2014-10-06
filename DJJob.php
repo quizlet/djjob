@@ -202,7 +202,7 @@ class DJWorker extends DJBase {
             self::sendError("DJWorker unhandled exception", $e->getMessage()."\n\n".var_export(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), true));
         }
 
-        $this->log("* [JOB] worker shutting down after running {$job_count} jobs, over {$count} polling iterations");
+        $this->log("* [JOB] Worker {$this->name} shutting down after running {$job_count} jobs, over {$count} polling iterations");
     }
 }
 
