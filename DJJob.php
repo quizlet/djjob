@@ -252,9 +252,9 @@ class DJJob extends DJBase {
         
         $lock = $this->runUpdate("
             UPDATE jobs
-            SET locked_at = NOW(), locked_by = ?
-            WHERE  id = ?
-        ", array($this->worker_name, $this->job_id));
+            SET    locked_at = NOW(), locked_by = ?
+            WHERE  id = ? AND (locked_at IS NULL OR locked_by = ?) AND failed_at IS NULL
+        ", array($this->worker_name, $this->job_id, $this->worker_name));
 
         if (!$lock) {
             $this->log("* [JOB] failed to acquire lock for job::{$this->job_id}");
