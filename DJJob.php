@@ -297,6 +297,7 @@ class DJJob extends DJBase {
     }
     
     public function finishWithError($handler, $e) {
+        $this->releaseLock();
         $error = $e->__toString()."\n";
         $this->runUpdate("
             UPDATE jobs
@@ -315,7 +316,6 @@ class DJJob extends DJBase {
         );
         $this->log("* [JOB] failure in job::{$this->job_id}: ".$error);
         self::sendError("DJJob failure in job::{$this->job_id}", $error."\n\n".var_export(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), true));
-        $this->releaseLock();
     }
     
     public function retryLater() {
