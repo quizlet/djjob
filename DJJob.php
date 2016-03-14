@@ -19,18 +19,18 @@ abstract class DJTask {
 }
 
 class DJBase {
-    
+
     private static $mail = null;
     private static $db = null;
     private static $outputLog = true;
-    
+
     private static $dsn = "";
     private static $options = array(
       "mysql_user" => null,
       "mysql_pass" => null,
     );
-    
-    // use either `configure` or `setConnection`, depending on if 
+
+    // use either `configure` or `setConnection`, depending on if
     // you already have a PDO object you can re-use
     public static function configure($dsn, array $options = array()) {
         self::$dsn = $dsn;
@@ -49,7 +49,7 @@ class DJBase {
     public static function outputLog($outputLog) {
         self::$outputLog = $outputLog;
     }
-    
+
     protected static function getConnection() {
         if (self::$db === null) {
             if (!self::$dsn) {
@@ -76,28 +76,28 @@ class DJBase {
         }
        forward_static_call(array(self::$mail, "devSend"), $subject, $message);
     }
-    
+
     public static function runQuery($sql, array $params = array()) {
         $stmt = self::getConnection()->prepare($sql);
         $stmt->execute($params);
-        
+
         $ret = array();
         if ($stmt->rowCount()) {
             // calling fetchAll on a result set with no rows throws a
             // "general error" exception
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) $ret []= $r;
         }
-        
+
         $stmt->closeCursor();
         return $ret;
     }
-    
+
     public static function runUpdate($sql, array $params = array()) {
         $stmt = self::getConnection()->prepare($sql);
         $stmt->execute($params);
         return $stmt->rowCount();
     }
-    
+
     protected static function log($mesg) {
         if (!self::$outputLog) return;
         echo "[".date('r')."] {$mesg}\n";
@@ -107,13 +107,13 @@ class DJBase {
 class DJWorker extends DJBase {
     // This is a singleton-ish thing. It wouldn't really make sense to
     // instantiate more than one in a single request (or commandline task)
-    
+
     public function __construct(array $options = array()) {
         $options = array_merge(array(
             "queue" => "default",
             "count" => 0,
             "sleep" => 5,
-            "quit_after_empty" => false,
+            "quit_after_empty" => true,
         ), $options);
         list($this->queue, $this->count, $this->sleep, $this->quit_after_empty) =
             array($options["queue"], $options["count"], $options["sleep"], $options["quit_after_empty"]);
@@ -126,19 +126,19 @@ class DJWorker extends DJBase {
             pcntl_signal(SIGINT, array($this, "handleSignal"));
         }
     }
-    
+
     public function handleSignal($signo) {
         $signals = array(
             SIGTERM => "SIGTERM",
             SIGINT  => "SIGINT"
         );
         $signal = $signals[$signo];
-        
+
         $this->log("* [WORKER] Received received {$signal}... Shutting down");
         $this->releaseLocks();
         die(0);
     }
-    
+
     public function releaseLocks() {
         $this->runUpdate("
             UPDATE jobs
@@ -147,7 +147,7 @@ class DJWorker extends DJBase {
             array($this->name)
         );
     }
-    
+
     public function getNewJob() {
         // we can grab a locked job if we own the lock
         $rs = $this->runQuery("
@@ -160,18 +160,18 @@ class DJWorker extends DJBase {
             ORDER BY RAND()
             LIMIT 1
         ", array($this->queue, $this->name));
-        
+
         foreach ($rs as $r) {
             $job = new DJJob($this->name, $r["id"]);
             if ($job->acquireLock()) return $job;
         }
-        
+
         return false;
     }
-    
+
     public function start() {
         $this->log("* [JOB] Starting worker {$this->name} on queue::{$this->queue}");
-        
+
         $count = 0;
         $job_count = 0;
         try {
@@ -183,15 +183,11 @@ class DJWorker extends DJBase {
 
                 if (!$job) {
                     $this->log("* [JOB] Failed to get a job, queue::{$this->queue} may be empty");
-                    
+
                     sleep($this->sleep);
-                    
-                    if ($this->quit_after_empty) {
-                        $this->log("* [JOB] Quitting worker {$this->name} on queue::{$this->queue} since queue was empty.");
-                        die;
-                    }
-                    
-                    continue;
+
+                    $this->log("* [JOB] Quitting worker {$this->name} on queue::{$this->queue} since queue was empty.");
+                    return;
                 }
 
                 $job_count += 1;
@@ -209,12 +205,12 @@ class DJWorker extends DJBase {
 class DJJob extends DJBase {
 
     private $handler = null;
-    
+
     public function __construct($worker_name, $job_id, array $options = array()) {
         $this->worker_name = $worker_name;
         $this->job_id = (int) $job_id;
     }
-    
+
     public function run() {
         # pull the handler from the db
         $handler = $this->getHandler();
@@ -227,29 +223,29 @@ class DJJob extends DJBase {
         try {
 
             $handler->perform();
-            
+
             # cleanup
             $this->finish();
             return true;
-            
+
         } catch (DJRetryException $e) {
-            
+
             # signal that this job should be retried later
             $this->log("* [JOB] got DJRetryException ".$e->getMessage());
             $this->retryLater();
             return false;
-            
+
         } catch (Exception $e) {
-            
+
             $this->finishWithError($handler, $e);
             return false;
-            
+
         }
     }
-    
+
     public function acquireLock() {
         $this->log("* [JOB] attempting to acquire lock for job::{$this->job_id} on {$this->worker_name}");
-        
+
         $lock = $this->runUpdate("
             UPDATE jobs
             SET    locked_at = NOW(), locked_by = ?
@@ -273,12 +269,12 @@ class DJJob extends DJBase {
             $this->log("* [JOB] failed to acquire lock for job::{$this->job_id}");
             return false;
         }
-		
+
 		$this->log("* [JOB] acquired lock for job::{$this->job_id} on {$this->worker_name}");
-        
+
         return true;
     }
-    
+
     public function releaseLock() {
         $this->runUpdate("
             UPDATE jobs
@@ -287,15 +283,15 @@ class DJJob extends DJBase {
             array($this->job_id)
         );
     }
-    
+
     public function finish() {
         $this->runUpdate(
-            "DELETE FROM jobs WHERE id = ?", 
+            "DELETE FROM jobs WHERE id = ?",
             array($this->job_id)
         );
         $this->log("* [JOB] completed job::{$this->job_id}");
     }
-    
+
     public function finishWithError($handler, $e) {
         $error = $e->__toString()."\n";
         $this->runUpdate("
@@ -317,7 +313,7 @@ class DJJob extends DJBase {
         self::sendError("DJJob failure in job::{$this->job_id}", $error."\n\n".var_export(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), true));
         $this->releaseLock();
     }
-    
+
     public function retryLater() {
         $this->runUpdate("
             UPDATE jobs
@@ -328,7 +324,7 @@ class DJJob extends DJBase {
         );
         $this->releaseLock();
     }
-    
+
     /**
      * @return DJTask
      */
@@ -337,7 +333,7 @@ class DJJob extends DJBase {
             return $this->handler;
         }
         $rs = $this->runQuery(
-            "SELECT handler FROM jobs WHERE id = ?", 
+            "SELECT handler FROM jobs WHERE id = ?",
             array($this->job_id)
         );
         if (!$rs)
@@ -345,23 +341,23 @@ class DJJob extends DJBase {
         $this->handler = unserialize($rs[0]["handler"]);
         return $this->handler;
     }
-    
+
     public static function enqueue(DJTask $handler, $queue = "default", $run_at = null) {
         $affected = self::runUpdate(
             "INSERT INTO jobs (handler, queue, run_at, created_at) VALUES(?, ?, ?, NOW())",
             array(serialize($handler), (string) $queue, $run_at)
         );
-        
+
         if ($affected < 1) {
             self::log("* [JOB] failed to enqueue new job");
             return false;
         }
-        
+
         return true;
     }
-    
+
     public static function bulkEnqueue(array $handlers, $queue = "default", $run_at = null) {
-        
+
         $parameters = array();
         foreach ($handlers as $k => $handler) {
 
@@ -380,23 +376,23 @@ class DJJob extends DJBase {
             $parameters []= (string) $queue;
             $parameters []= $run_at;
         }
-        
+
         $sql = "INSERT INTO jobs (handler, queue, run_at, created_at) VALUES";
         $sql .= implode(",", array_fill(0, count($handlers), "(?, ?, ?, NOW())"));
-    
+
         $affected = self::runUpdate($sql, $parameters);
-                
+
         if ($affected < 1) {
             self::log("* [JOB] failed to enqueue new jobs");
             return false;
         }
-        
+
         if ($affected != count($handlers))
             self::log("* [JOB] failed to enqueue some new jobs");
-        
+
         return true;
     }
-    
+
     public static function status($queue = "default") {
         $rs = self::runQuery("
             SELECT COUNT(*) as total, COUNT(failed_at) as failed, COUNT(locked_at) as locked
@@ -404,12 +400,12 @@ class DJJob extends DJBase {
             WHERE queue = ?
         ", array($queue));
         $rs = $rs[0];
-        
+
         $failed = $rs["failed"];
         $locked = $rs["locked"];
         $total  = $rs["total"];
         $outstanding = $total - $locked - $failed;
-        
+
         return array(
             "outstanding" => $outstanding,
             "locked" => $locked,
